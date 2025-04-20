@@ -36,6 +36,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_drawing_board: ^0.9.8
   whiteboard: ^1.0.0
+  flutter_quill_extensions: ^11.0.0
+  flutter_quill: ^11.2.0
 
 dev_dependencies:
   flutter_test:
