@@ -1,0 +1,9 @@
+things to add
+1. scrollview
+2. resizing should be allowed on all sides, top, right, bottom, left
+3. delete button for selected boxes
+4. padding at edge of screen, 16px
+5. when user is dragging, there should be tracking e.g for margin or space between text boxes around it
+6. alignment of text boxes
+7. pdf content refinement
+8. text editing e.g font size, syle, family, color, adding bullets etc

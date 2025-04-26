@@ -48,6 +48,9 @@ class _DrawingScreenState extends State<DrawingScreen> {
   Offset? _dragStartOffset;
   bool _isResizing = false;
   Corner _resizingCorner = Corner.none;
+  
+  // Screen padding constants
+  final double screenPadding = 8.0;
 
   @override
   Widget build(BuildContext context) {
@@ -74,6 +77,12 @@ class _DrawingScreenState extends State<DrawingScreen> {
                 });
               },
             ),
+            // DELETE BUTTON - Only visible when in edit mode and an element is selected
+            if (_selectedElement != null)
+              IconButton(
+                icon: Icon(Icons.delete, color: Colors.red),
+                onPressed: _deleteSelectedElement,
+              ),
             IconButton(
               icon: Icon(Icons.done),
               onPressed: _toggleEditMode,
@@ -91,79 +100,105 @@ class _DrawingScreenState extends State<DrawingScreen> {
           ]
         ],
       ),
-      body: Stack(
-        children: [
-          GestureDetector(
-            onPanStart: (details) {
-              if (_editMode) return;
-              setState(() {
-                _startPoint = details.localPosition;
-                _currentPoint = details.localPosition;
-              });
-            },
-            onPanUpdate: (details) {
-              if (_editMode) return;
-              setState(() => _currentPoint = details.localPosition);
-            },
-            onPanEnd: (details) {
-              if (_editMode) return;
-              setState(() {
-                if (_startPoint != null && _currentPoint != null) {
-                  final rect = Rect.fromPoints(_startPoint!, _currentPoint!);
-                  if (rect.width.abs() > 5 && rect.height.abs() > 5) {
-                    rectangles.add(rect);
+      body: Padding(
+        padding: EdgeInsets.all(screenPadding),
+        child: Stack(
+          children: [
+            GestureDetector(
+              onPanStart: (details) {
+                if (_editMode) return;
+                setState(() {
+                  _startPoint = details.localPosition;
+                  _currentPoint = details.localPosition;
+                });
+              },
+              onPanUpdate: (details) {
+                if (_editMode) return;
+                setState(() => _currentPoint = details.localPosition);
+              },
+              onPanEnd: (details) {
+                if (_editMode) return;
+                setState(() {
+                  if (_startPoint != null && _currentPoint != null) {
+                    final rect = Rect.fromPoints(
+                      Offset(
+                        _startPoint!.dx.clamp(screenPadding, MediaQuery.of(context).size.width - screenPadding),
+                        _startPoint!.dy.clamp(screenPadding, MediaQuery.of(context).size.height - screenPadding),
+                      ),
+                      Offset(
+                        _currentPoint!.dx.clamp(screenPadding, MediaQuery.of(context).size.width - screenPadding),
+                        _currentPoint!.dy.clamp(screenPadding, MediaQuery.of(context).size.height - screenPadding),
+                      ),
+                    );
+                    if (rect.width.abs() > 5 && rect.height.abs() > 5) {
+                      rectangles.add(rect);
+                    }
                   }
-                }
-                _startPoint = null;
-                _currentPoint = null;
-              });
-            },
-            child: CustomPaint(
-              painter: DrawingPainter(
-                rectangles: rectangles,
-                currentRect: _startPoint != null && _currentPoint != null 
-                  ? Rect.fromPoints(_startPoint!, _currentPoint!) 
-                  : null,
-                textElements: textElements,
-                editMode: _editMode,
-                selectedElement: _selectedElement,
-              ),
-              child: Container(
-                width: MediaQuery.of(context).size.width,
-                height: MediaQuery.of(context).size.height,
+                  _startPoint = null;
+                  _currentPoint = null;
+                });
+              },
+              child: CustomPaint(
+                painter: DrawingPainter(
+                  rectangles: rectangles,
+                  currentRect: _startPoint != null && _currentPoint != null 
+                    ? Rect.fromPoints(
+                        Offset(
+                          _startPoint!.dx.clamp(screenPadding, MediaQuery.of(context).size.width - screenPadding),
+                          _startPoint!.dy.clamp(screenPadding, MediaQuery.of(context).size.height - screenPadding),
+                        ),
+                        Offset(
+                          _currentPoint!.dx.clamp(screenPadding, MediaQuery.of(context).size.width - screenPadding),
+                          _currentPoint!.dy.clamp(screenPadding, MediaQuery.of(context).size.height - screenPadding),
+                        ),
+                      )
+                    : null,
+                  textElements: textElements,
+                  editMode: _editMode,
+                  selectedElement: _selectedElement,
+                ),
+                child: Container(
+                  width: MediaQuery.of(context).size.width - 2 * screenPadding,
+                  height: MediaQuery.of(context).size.height - 2 * screenPadding,
+                ),
               ),
             ),
-          ),
-          
-          ...textElements.map((element) {
-            bool isSelected = _editMode && _selectedElement == element;
-            return Positioned(
-              left: element.position.dx,
-              top: element.position.dy,
-              child: GestureDetector(
-                onTap: () {
-                  if (_editMode && _positionEditMode) {
-                    setState(() => _selectedElement = element);
-                  }
-                },
-                onPanStart: (details) {
-                  if (isSelected && _positionEditMode) {
-                    setState(() => _dragStartOffset = details.localPosition);
-                  }
-                },
-                onPanUpdate: (details) {
-                  if (isSelected && _positionEditMode && _dragStartOffset != null) {
-                    setState(() {
-                      element.position += details.localPosition - _dragStartOffset!;
-                      _dragStartOffset = details.localPosition;
-                    });
-                  }
-                },
-                child: _buildTextElement(element, isSelected),
-              ),
-            );
-          }).toList(),
-        ],
+            
+            ...textElements.map((element) {
+              bool isSelected = _editMode && _selectedElement == element;
+              return Positioned(
+                left: element.position.dx,
+                top: element.position.dy,
+                child: GestureDetector(
+                  onTap: () {
+                    if (_editMode && _positionEditMode) {
+                      setState(() => _selectedElement = element);
+                    }
+                  },
+                  onPanStart: (details) {
+                    if (isSelected && _positionEditMode) {
+                      setState(() => _dragStartOffset = details.localPosition);
+                    }
+                  },
+                  onPanUpdate: (details) {
+                    if (isSelected && _positionEditMode && _dragStartOffset != null) {
+                      setState(() {
+                        // Constrain movement within screen bounds
+                        final newPosition = element.position + (details.localPosition - _dragStartOffset!);
+                        element.position = Offset(
+                          newPosition.dx.clamp(screenPadding, MediaQuery.of(context).size.width - screenPadding - element.size.width),
+                          newPosition.dy.clamp(screenPadding, MediaQuery.of(context).size.height - screenPadding - element.size.height),
+                        );
+                        _dragStartOffset = details.localPosition;
+                      });
+                    }
+                  },
+                  child: _buildTextElement(element, isSelected),
+                ),
+              );
+            }).toList(),
+          ],
+        ),
       ),
       floatingActionButton: _editMode ? null : FloatingActionButton(
         child: Icon(Icons.text_fields),
@@ -227,8 +262,14 @@ class _DrawingScreenState extends State<DrawingScreen> {
             ),
             
             if (isSelected && _positionEditMode) ...[
-              _buildResizeHandle(element, Corner.left),
+              // Top resize handle
+              _buildResizeHandle(element, Corner.top),
+              // Right resize handle
               _buildResizeHandle(element, Corner.right),
+              // Bottom resize handle
+              _buildResizeHandle(element, Corner.bottom),
+              // Left resize handle
+              _buildResizeHandle(element, Corner.left),
             ],
           ],
         );
@@ -240,7 +281,8 @@ class _DrawingScreenState extends State<DrawingScreen> {
     return Positioned(
       left: corner == Corner.left ? 0 : null,
       right: corner == Corner.right ? 0 : null,
-      top: element.size.height / 2 - 8,
+      top: corner == Corner.top ? 0 : null,
+      bottom: corner == Corner.bottom ? 0 : null,
       child: GestureDetector(
         onPanStart: (details) {
           setState(() {
@@ -253,14 +295,43 @@ class _DrawingScreenState extends State<DrawingScreen> {
           if (_isResizing && _dragStartOffset != null) {
             setState(() {
               final delta = details.localPosition - _dragStartOffset!;
-              if (corner == Corner.left) {
-                element.position += Offset(delta.dx, 0);
-                element.size = Size(element.size.width - delta.dx, element.size.height);
-              } else {
-                element.size = Size(element.size.width + delta.dx, element.size.height);
+              
+              switch (corner) {
+                case Corner.left:
+                  final newWidth = element.size.width - delta.dx;
+                  if (newWidth > 50 && 
+                      element.position.dx + delta.dx >= screenPadding) {
+                    element.position += Offset(delta.dx, 0);
+                    element.size = Size(newWidth, element.size.height);
+                  }
+                  break;
+                case Corner.right:
+                  final newWidth = element.size.width + delta.dx;
+                  if (newWidth > 50 && 
+                      element.position.dx + newWidth <= MediaQuery.of(context).size.width - screenPadding) {
+                    element.size = Size(newWidth, element.size.height);
+                  }
+                  break;
+                case Corner.top:
+                  final newHeight = element.size.height - delta.dy;
+                  if (newHeight > 30 && 
+                      element.position.dy + delta.dy >= screenPadding) {
+                    element.position += Offset(0, delta.dy);
+                    element.size = Size(element.size.width, newHeight);
+                  }
+                  break;
+                case Corner.bottom:
+                  final newHeight = element.size.height + delta.dy;
+                  if (newHeight > 30 && 
+                      element.position.dy + newHeight <= MediaQuery.of(context).size.height - screenPadding) {
+                    element.size = Size(element.size.width, newHeight);
+                  }
+                  break;
+                case Corner.none:
+                  break;
               }
+              
               _dragStartOffset = details.localPosition;
-              if (element.size.width < 50) element.size = Size(50, element.size.height);
             });
           }
         },
@@ -280,6 +351,15 @@ class _DrawingScreenState extends State<DrawingScreen> {
         ),
       ),
     );
+  }
+
+  void _deleteSelectedElement() {
+    if (_selectedElement != null) {
+      setState(() {
+        textElements.remove(_selectedElement);
+        _selectedElement = null;
+      });
+    }
   }
 
   void _toggleEditMode() {
@@ -517,7 +597,7 @@ class TextElement {
   });
 }
 
-enum Corner { none, left, right }
+enum Corner { none, left, right, top, bottom }
 
 class TextInputDialog extends StatefulWidget {
   const TextInputDialog({super.key});
