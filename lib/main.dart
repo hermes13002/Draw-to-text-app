@@ -50,7 +50,13 @@ class _DrawingScreenState extends State<DrawingScreen> {
   Corner _resizingCorner = Corner.none;
   
   // Screen padding constants
-  final double screenPadding = 8.0;
+  final double screenPadding = 20.0;
+  
+  // Alignment guides
+  List<AlignmentGuide> activeGuides = [];
+  double snapThreshold = 8.0;
+  bool showGrid = false;
+  double gridSize = 20.0;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +71,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
                 setState(() {
                   _contentEditMode = true;
                   _positionEditMode = false;
+                  activeGuides.clear();
                 });
               },
             ),
@@ -77,7 +84,15 @@ class _DrawingScreenState extends State<DrawingScreen> {
                 });
               },
             ),
-            // DELETE BUTTON - Only visible when in edit mode and an element is selected
+            IconButton(
+              icon: Icon(Icons.grid_on, color: showGrid ? Colors.blue : null),
+              onPressed: () {
+                setState(() {
+                  showGrid = !showGrid;
+                });
+              },
+              tooltip: 'Toggle Grid',
+            ),
             if (_selectedElement != null)
               IconButton(
                 icon: Icon(Icons.delete, color: Colors.red),
@@ -102,102 +117,193 @@ class _DrawingScreenState extends State<DrawingScreen> {
       ),
       body: Padding(
         padding: EdgeInsets.all(screenPadding),
-        child: Stack(
-          children: [
-            GestureDetector(
-              onPanStart: (details) {
-                if (_editMode) return;
-                setState(() {
-                  _startPoint = details.localPosition;
-                  _currentPoint = details.localPosition;
-                });
-              },
-              onPanUpdate: (details) {
-                if (_editMode) return;
-                setState(() => _currentPoint = details.localPosition);
-              },
-              onPanEnd: (details) {
-                if (_editMode) return;
-                setState(() {
-                  if (_startPoint != null && _currentPoint != null) {
-                    final rect = Rect.fromPoints(
-                      Offset(
-                        _startPoint!.dx.clamp(screenPadding, MediaQuery.of(context).size.width - screenPadding),
-                        _startPoint!.dy.clamp(screenPadding, MediaQuery.of(context).size.height - screenPadding),
-                      ),
-                      Offset(
-                        _currentPoint!.dx.clamp(screenPadding, MediaQuery.of(context).size.width - screenPadding),
-                        _currentPoint!.dy.clamp(screenPadding, MediaQuery.of(context).size.height - screenPadding),
-                      ),
-                    );
-                    if (rect.width.abs() > 5 && rect.height.abs() > 5) {
-                      rectangles.add(rect);
-                    }
-                  }
-                  _startPoint = null;
-                  _currentPoint = null;
-                });
-              },
-              child: CustomPaint(
-                painter: DrawingPainter(
-                  rectangles: rectangles,
-                  currentRect: _startPoint != null && _currentPoint != null 
-                    ? Rect.fromPoints(
-                        Offset(
-                          _startPoint!.dx.clamp(screenPadding, MediaQuery.of(context).size.width - screenPadding),
-                          _startPoint!.dy.clamp(screenPadding, MediaQuery.of(context).size.height - screenPadding),
-                        ),
-                        Offset(
-                          _currentPoint!.dx.clamp(screenPadding, MediaQuery.of(context).size.width - screenPadding),
-                          _currentPoint!.dy.clamp(screenPadding, MediaQuery.of(context).size.height - screenPadding),
-                        ),
-                      )
-                    : null,
-                  textElements: textElements,
-                  editMode: _editMode,
-                  selectedElement: _selectedElement,
-                ),
-                child: Container(
-                  width: MediaQuery.of(context).size.width - 2 * screenPadding,
-                  height: MediaQuery.of(context).size.height - 2 * screenPadding,
-                ),
-              ),
-            ),
-            
-            ...textElements.map((element) {
-              bool isSelected = _editMode && _selectedElement == element;
-              return Positioned(
-                left: element.position.dx,
-                top: element.position.dy,
-                child: GestureDetector(
-                  onTap: () {
-                    if (_editMode && _positionEditMode) {
-                      setState(() => _selectedElement = element);
-                    }
-                  },
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Stack(
+              children: [
+                // Grid Background
+                if (showGrid)
+                  CustomPaint(
+                    painter: GridPainter(
+                      gridSize: gridSize,
+                      color: Colors.grey.withOpacity(0.3),
+                    ),
+                    size: Size.infinite,
+                  ),
+                
+                // Drawing Canvas
+                GestureDetector(
                   onPanStart: (details) {
-                    if (isSelected && _positionEditMode) {
-                      setState(() => _dragStartOffset = details.localPosition);
-                    }
+                    if (_editMode) return;
+                    setState(() {
+                      _startPoint = details.localPosition;
+                      _currentPoint = details.localPosition;
+                    });
                   },
                   onPanUpdate: (details) {
-                    if (isSelected && _positionEditMode && _dragStartOffset != null) {
-                      setState(() {
-                        // Constrain movement within screen bounds
-                        final newPosition = element.position + (details.localPosition - _dragStartOffset!);
-                        element.position = Offset(
-                          newPosition.dx.clamp(screenPadding, MediaQuery.of(context).size.width - screenPadding - element.size.width),
-                          newPosition.dy.clamp(screenPadding, MediaQuery.of(context).size.height - screenPadding - element.size.height),
-                        );
-                        _dragStartOffset = details.localPosition;
-                      });
-                    }
+                    if (_editMode) return;
+                    setState(() => _currentPoint = details.localPosition);
                   },
-                  child: _buildTextElement(element, isSelected),
+                  onPanEnd: (details) {
+                    if (_editMode) return;
+                    setState(() {
+                      if (_startPoint != null && _currentPoint != null) {
+                        final rect = Rect.fromPoints(
+                          Offset(
+                            _startPoint!.dx.clamp(screenPadding, constraints.maxWidth - screenPadding),
+                            _startPoint!.dy.clamp(screenPadding, constraints.maxHeight - screenPadding),
+                          ),
+                          Offset(
+                            _currentPoint!.dx.clamp(screenPadding, constraints.maxWidth - screenPadding),
+                            _currentPoint!.dy.clamp(screenPadding, constraints.maxHeight - screenPadding),
+                          ),
+                        );
+                        if (rect.width.abs() > 5 && rect.height.abs() > 5) {
+                          rectangles.add(rect);
+                        }
+                      }
+                      _startPoint = null;
+                      _currentPoint = null;
+                    });
+                  },
+                  child: CustomPaint(
+                    painter: DrawingPainter(
+                      rectangles: rectangles,
+                      currentRect: _startPoint != null && _currentPoint != null 
+                        ? Rect.fromPoints(
+                            Offset(
+                              _startPoint!.dx.clamp(screenPadding, constraints.maxWidth - screenPadding),
+                              _startPoint!.dy.clamp(screenPadding, constraints.maxHeight - screenPadding),
+                            ),
+                            Offset(
+                              _currentPoint!.dx.clamp(screenPadding, constraints.maxWidth - screenPadding),
+                              _currentPoint!.dy.clamp(screenPadding, constraints.maxHeight - screenPadding),
+                            ),
+                          )
+                        : null,
+                      textElements: textElements,
+                      editMode: _editMode,
+                      selectedElement: _selectedElement,
+                    ),
+                    child: Container(
+                      width: constraints.maxWidth,
+                      height: constraints.maxHeight,
+                    ),
+                  ),
                 ),
-              );
-            }).toList(),
-          ],
+                
+                // Text Elements
+                ...textElements.map((element) {
+                  bool isSelected = _editMode && _selectedElement == element;
+                  return Positioned(
+                    left: element.position.dx,
+                    top: element.position.dy,
+                    child: GestureDetector(
+                      onTap: () {
+                        if (_editMode && _positionEditMode) {
+                          setState(() => _selectedElement = element);
+                        }
+                      },
+                      onPanStart: (details) {
+                        if (isSelected && _positionEditMode) {
+                          setState(() {
+                            _dragStartOffset = details.localPosition;
+                            activeGuides.clear();
+                          });
+                        }
+                      },
+                      onPanUpdate: (details) {
+                        if (isSelected && _positionEditMode && _dragStartOffset != null) {
+                          setState(() {
+                            // Calculate proposed new position
+                            Offset newPosition = element.position + (details.localPosition - _dragStartOffset!);
+                            
+                            // Clear previous guides
+                            activeGuides.clear();
+                            
+                            // Check for alignments
+                            _checkAlignments(element, newPosition, constraints);
+                            
+                            // Apply snapping if close to guide
+                            for (var guide in activeGuides) {
+                              if (guide.type == GuideType.horizontal) {
+                                if ((newPosition.dy - guide.position).abs() < snapThreshold) {
+                                  newPosition = Offset(newPosition.dx, guide.position);
+                                }
+                              } else if (guide.type == GuideType.vertical) {
+                                if ((newPosition.dx - guide.position).abs() < snapThreshold) {
+                                  newPosition = Offset(guide.position, newPosition.dy);
+                                }
+                              }
+                            }
+                            
+                            // Update position with constraints
+                            element.position = Offset(
+                              newPosition.dx.clamp(screenPadding, constraints.maxWidth - screenPadding - element.size.width),
+                              newPosition.dy.clamp(screenPadding, constraints.maxHeight - screenPadding - element.size.height),
+                            );
+                            
+                            _dragStartOffset = details.localPosition;
+                          });
+                        }
+                      },
+                      onPanEnd: (details) {
+                        setState(() {
+                          activeGuides.clear();
+                        });
+                      },
+                      child: _buildTextElement(element, isSelected, constraints),
+                    ),
+                  );
+                }).toList(),
+                
+                // Alignment Guides
+                if (_editMode && _positionEditMode && _selectedElement != null)
+                  ...activeGuides.map((guide) {
+                    return Positioned(
+                      left: guide.type == GuideType.vertical ? guide.position : 0,
+                      top: guide.type == GuideType.horizontal ? guide.position : 0,
+                      child: Container(
+                        width: guide.type == GuideType.vertical ? 1 : constraints.maxWidth,
+                        height: guide.type == GuideType.horizontal ? 1 : constraints.maxHeight,
+                        decoration: BoxDecoration(
+                          border: Border(
+                            top: guide.type == GuideType.horizontal 
+                              ? BorderSide(color: guide.color, width: 1, style: BorderStyle.solid)
+                              : BorderSide.none,
+                            left: guide.type == GuideType.vertical 
+                              ? BorderSide(color: guide.color, width: 1, style: BorderStyle.solid)
+                              : BorderSide.none,
+                          ),
+                        ),
+                        child: guide.label != null ? Center(
+                          child: Container(
+                            padding: EdgeInsets.all(2),
+                            color: guide.color.withOpacity(0.2),
+                            child: Text(
+                              guide.label!,
+                              style: TextStyle(color: guide.color, fontSize: 12),
+                            ),
+                          ),
+                        ) : null,
+                      ),
+                    );
+                  }),
+                
+                // Alignment Toolbar
+                if (_editMode && _positionEditMode && _selectedElement != null)
+                  Positioned(
+                    bottom: 20,
+                    right: 20,
+                    child: AlignmentToolbar(
+                      onAlign: (alignment) {
+                        _alignSelectedElements(alignment);
+                      },
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ),
       floatingActionButton: _editMode ? null : FloatingActionButton(
@@ -207,7 +313,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
     );
   }
 
-  Widget _buildTextElement(TextElement element, bool isSelected) {
+  Widget _buildTextElement(TextElement element, bool isSelected, BoxConstraints constraints) {
     final textPainter = TextPainter(
       text: TextSpan(
         text: element.controller.text,
@@ -263,13 +369,13 @@ class _DrawingScreenState extends State<DrawingScreen> {
             
             if (isSelected && _positionEditMode) ...[
               // Top resize handle
-              _buildResizeHandle(element, Corner.top),
+              _buildResizeHandle(element, Corner.top, constraints),
               // Right resize handle
-              _buildResizeHandle(element, Corner.right),
+              _buildResizeHandle(element, Corner.right, constraints),
               // Bottom resize handle
-              _buildResizeHandle(element, Corner.bottom),
+              _buildResizeHandle(element, Corner.bottom, constraints),
               // Left resize handle
-              _buildResizeHandle(element, Corner.left),
+              _buildResizeHandle(element, Corner.left, constraints),
             ],
           ],
         );
@@ -277,7 +383,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
     );
   }
 
-  Widget _buildResizeHandle(TextElement element, Corner corner) {
+  Widget _buildResizeHandle(TextElement element, Corner corner, BoxConstraints constraints) {
     return Positioned(
       left: corner == Corner.left ? 0 : null,
       right: corner == Corner.right ? 0 : null,
@@ -308,7 +414,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
                 case Corner.right:
                   final newWidth = element.size.width + delta.dx;
                   if (newWidth > 50 && 
-                      element.position.dx + newWidth <= MediaQuery.of(context).size.width - screenPadding) {
+                      element.position.dx + newWidth <= constraints.maxWidth - screenPadding) {
                     element.size = Size(newWidth, element.size.height);
                   }
                   break;
@@ -323,7 +429,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
                 case Corner.bottom:
                   final newHeight = element.size.height + delta.dy;
                   if (newHeight > 30 && 
-                      element.position.dy + newHeight <= MediaQuery.of(context).size.height - screenPadding) {
+                      element.position.dy + newHeight <= constraints.maxHeight - screenPadding) {
                     element.size = Size(element.size.width, newHeight);
                   }
                   break;
@@ -353,6 +459,240 @@ class _DrawingScreenState extends State<DrawingScreen> {
     );
   }
 
+  void _checkAlignments(TextElement movingElement, Offset newPosition, BoxConstraints constraints) {
+    Rect movingRect = Rect.fromLTWH(
+      newPosition.dx, 
+      newPosition.dy, 
+      movingElement.size.width, 
+      movingElement.size.height
+    );
+    
+    // Check against other elements
+    for (var element in textElements) {
+      if (element == movingElement) continue;
+      
+      Rect fixedRect = Rect.fromLTWH(
+        element.position.dx,
+        element.position.dy,
+        element.size.width,
+        element.size.height
+      );
+      
+      // Edge alignments
+      _checkEdgeAlignment(movingRect, fixedRect);
+      
+      // Center alignments
+      _checkCenterAlignment(movingRect, fixedRect);
+      
+      // Spacing
+      _checkSpacing(movingRect, fixedRect);
+    }
+    
+    // Screen edge guides
+    _checkScreenAlignment(movingRect, constraints);
+  }
+
+  void _checkEdgeAlignment(Rect moving, Rect fixed) {
+    // Left edge
+    if ((moving.left - fixed.left).abs() < 20) {
+      activeGuides.add(AlignmentGuide(GuideType.vertical, fixed.left, label: "Left"));
+    }
+    
+    // Right edge
+    if ((moving.right - fixed.right).abs() < 20) {
+      activeGuides.add(AlignmentGuide(GuideType.vertical, fixed.right, label: "Right"));
+    }
+    
+    // Top edge
+    if ((moving.top - fixed.top).abs() < 20) {
+      activeGuides.add(AlignmentGuide(GuideType.horizontal, fixed.top, label: "Top"));
+    }
+    
+    // Bottom edge
+    if ((moving.bottom - fixed.bottom).abs() < 20) {
+      activeGuides.add(AlignmentGuide(GuideType.horizontal, fixed.bottom, label: "Bottom"));
+    }
+  }
+
+  void _checkCenterAlignment(Rect moving, Rect fixed) {
+    // Vertical center
+    if ((moving.center.dx - fixed.center.dx).abs() < 20) {
+      activeGuides.add(AlignmentGuide(
+        GuideType.vertical, 
+        fixed.center.dx,
+        label: "Center",
+        color: Colors.green
+      ));
+    }
+    
+    // Horizontal center
+    if ((moving.center.dy - fixed.center.dy).abs() < 20) {
+      activeGuides.add(AlignmentGuide(
+        GuideType.horizontal, 
+        fixed.center.dy,
+        label: "Middle",
+        color: Colors.green
+      ));
+    }
+  }
+
+  void _checkSpacing(Rect moving, Rect fixed) {
+    // Horizontal spacing
+    if ((moving.left - fixed.right).abs() < 40) {
+      activeGuides.add(AlignmentGuide(
+        GuideType.vertical, 
+        moving.left,
+        label: "${(moving.left - fixed.right).abs().toStringAsFixed(0)}px",
+        color: Colors.orange
+      ));
+    }
+    
+    // Vertical spacing
+    if ((moving.top - fixed.bottom).abs() < 40) {
+      activeGuides.add(AlignmentGuide(
+        GuideType.horizontal, 
+        moving.top,
+        label: "${(moving.top - fixed.bottom).abs().toStringAsFixed(0)}px",
+        color: Colors.orange
+      ));
+    }
+  }
+
+  void _checkScreenAlignment(Rect rect, BoxConstraints constraints) {
+    // Screen edges
+    if ((rect.left - screenPadding).abs() < 20) {
+      activeGuides.add(AlignmentGuide(
+        GuideType.vertical, 
+        screenPadding,
+        label: "Left Margin",
+        color: Colors.purple
+      ));
+    }
+    
+    if ((rect.right - (constraints.maxWidth - screenPadding)).abs() < 20) {
+      activeGuides.add(AlignmentGuide(
+        GuideType.vertical, 
+        constraints.maxWidth - screenPadding,
+        label: "Right Margin",
+        color: Colors.purple
+      ));
+    }
+    
+    if ((rect.top - screenPadding).abs() < 20) {
+      activeGuides.add(AlignmentGuide(
+        GuideType.horizontal, 
+        screenPadding,
+        label: "Top Margin",
+        color: Colors.purple
+      ));
+    }
+    
+    if ((rect.bottom - (constraints.maxHeight - screenPadding)).abs() < 20) {
+      activeGuides.add(AlignmentGuide(
+        GuideType.horizontal, 
+        constraints.maxHeight - screenPadding,
+        label: "Bottom Margin",
+        color: Colors.purple
+      ));
+    }
+    
+    // Screen center
+    final screenCenterX = constraints.maxWidth / 2;
+    if ((rect.center.dx - screenCenterX).abs() < 20) {
+      activeGuides.add(AlignmentGuide(
+        GuideType.vertical, 
+        screenCenterX,
+        label: "Screen Center",
+        color: Colors.purple
+      ));
+    }
+    
+    final screenCenterY = constraints.maxHeight / 2;
+    if ((rect.center.dy - screenCenterY).abs() < 20) {
+      activeGuides.add(AlignmentGuide(
+        GuideType.horizontal, 
+        screenCenterY,
+        label: "Screen Middle",
+        color: Colors.purple
+      ));
+    }
+  }
+
+  void _alignSelectedElements(AlignmentType alignment) {
+    if (_selectedElement == null) return;
+    
+    setState(() {
+      Rect selectedRect = Rect.fromLTWH(
+        _selectedElement!.position.dx,
+        _selectedElement!.position.dy,
+        _selectedElement!.size.width,
+        _selectedElement!.size.height
+      );
+      
+      for (var element in textElements) {
+        if (element == _selectedElement) continue;
+        
+        Rect otherRect = Rect.fromLTWH(
+          element.position.dx,
+          element.position.dy,
+          element.size.width,
+          element.size.height
+        );
+        
+        switch (alignment) {
+          case AlignmentType.left:
+            if ((selectedRect.left - otherRect.left).abs() < 20) {
+              _selectedElement!.position = Offset(
+                otherRect.left,
+                _selectedElement!.position.dy
+              );
+            }
+            break;
+          case AlignmentType.right:
+            if ((selectedRect.right - otherRect.right).abs() < 20) {
+              _selectedElement!.position = Offset(
+                otherRect.right - _selectedElement!.size.width,
+                _selectedElement!.position.dy
+              );
+            }
+            break;
+          case AlignmentType.top:
+            if ((selectedRect.top - otherRect.top).abs() < 20) {
+              _selectedElement!.position = Offset(
+                _selectedElement!.position.dx,
+                otherRect.top
+              );
+            }
+            break;
+          case AlignmentType.bottom:
+            if ((selectedRect.bottom - otherRect.bottom).abs() < 20) {
+              _selectedElement!.position = Offset(
+                _selectedElement!.position.dx,
+                otherRect.bottom - _selectedElement!.size.height
+              );
+            }
+            break;
+          case AlignmentType.centerVertical:
+            if ((selectedRect.center.dx - otherRect.center.dx).abs() < 20) {
+              _selectedElement!.position = Offset(
+                otherRect.center.dx - (_selectedElement!.size.width / 2),
+                _selectedElement!.position.dy
+              );
+            }
+            break;
+          case AlignmentType.centerHorizontal:
+            if ((selectedRect.center.dy - otherRect.center.dy).abs() < 20) {
+              _selectedElement!.position = Offset(
+                _selectedElement!.position.dx,
+                otherRect.center.dy - (_selectedElement!.size.height / 2)
+              );
+            }
+            break;
+        }
+      }
+    });
+  }
+
   void _deleteSelectedElement() {
     if (_selectedElement != null) {
       setState(() {
@@ -367,6 +707,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
       _editMode = !_editMode;
       _contentEditMode = false;
       _positionEditMode = false;
+      activeGuides.clear();
       if (!_editMode) _selectedElement = null;
     });
   }
@@ -531,6 +872,90 @@ class _DrawingScreenState extends State<DrawingScreen> {
 
     return Rect.fromLTRB(minX, minY, maxX, maxY);
   }
+}
+
+// New supporting classes and enums:
+
+enum GuideType { horizontal, vertical, spacing }
+
+class AlignmentGuide {
+  final GuideType type;
+  final double position;
+  final String? label;
+  final Color color;
+
+  AlignmentGuide(this.type, this.position, {this.label, this.color = Colors.blue});
+}
+
+enum AlignmentType {
+  left,
+  right,
+  top,
+  bottom,
+  centerVertical,
+  centerHorizontal
+}
+
+class AlignmentToolbar extends StatelessWidget {
+  final Function(AlignmentType) onAlign;
+
+  const AlignmentToolbar({super.key, required this.onAlign});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildAlignmentButton(Icons.format_align_left, AlignmentType.left),
+            _buildAlignmentButton(Icons.format_align_center, AlignmentType.centerVertical),
+            _buildAlignmentButton(Icons.format_align_right, AlignmentType.right),
+            SizedBox(height: 8),
+            _buildAlignmentButton(Icons.vertical_align_top, AlignmentType.top),
+            _buildAlignmentButton(Icons.vertical_align_center, AlignmentType.centerHorizontal),
+            _buildAlignmentButton(Icons.vertical_align_bottom, AlignmentType.bottom),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAlignmentButton(IconData icon, AlignmentType type) {
+    return IconButton(
+      icon: Icon(icon),
+      onPressed: () => onAlign(type),
+      tooltip: type.toString().split('.').last,
+    );
+  }
+}
+
+class GridPainter extends CustomPainter {
+  final double gridSize;
+  final Color color;
+
+  GridPainter({required this.gridSize, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.0;
+
+    // Draw vertical lines
+    for (double x = 0; x < size.width; x += gridSize) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+
+    // Draw horizontal lines
+    for (double y = 0; y < size.height; y += gridSize) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class DrawingPainter extends CustomPainter {
