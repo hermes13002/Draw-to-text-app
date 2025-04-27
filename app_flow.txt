@@ -15,3 +15,7 @@ things to add
         * Supports left/right/top/bottom/center alignment
 7. pdf content refinement
 8. text editing e.g font size, syle, family, color, adding bullets etc
+
+LIMITATIONS
+1. users can not draw on any area where there's a textbox
+2. 
