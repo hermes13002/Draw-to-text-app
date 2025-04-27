@@ -132,6 +132,8 @@ class _DrawingScreenState extends State<DrawingScreen> {
                   ),
                 
                 // Drawing Canvas
+                // Handles drawing rectangles and text elements on the canvas.
+                // Uses GestureDetector to track touch events for drawing and moving elements.
                 GestureDetector(
                   onPanStart: (details) {
                     if (_editMode) return;
@@ -193,6 +195,8 @@ class _DrawingScreenState extends State<DrawingScreen> {
                 ),
                 
                 // Text Elements
+                // Places text elements on the canvas
+                // Handles selection, dragging, and alignment of text elements.
                 ...textElements.map((element) {
                   bool isSelected = _editMode && _selectedElement == element;
                   return Positioned(
@@ -258,6 +262,8 @@ class _DrawingScreenState extends State<DrawingScreen> {
                 }).toList(),
                 
                 // Alignment Guides
+                // Displays alignment guides when dragging elements
+                // Shows guides for edges, centers, and spacing between elements.
                 if (_editMode && _positionEditMode && _selectedElement != null)
                   ...activeGuides.map((guide) {
                     return Positioned(
@@ -291,6 +297,8 @@ class _DrawingScreenState extends State<DrawingScreen> {
                   }),
                 
                 // Alignment Toolbar
+                // Displays alignment options when an element is selected
+                // Allows user to align selected element with other elements or screen edges.
                 if (_editMode && _positionEditMode && _selectedElement != null)
                   Positioned(
                     bottom: 20,
@@ -313,6 +321,8 @@ class _DrawingScreenState extends State<DrawingScreen> {
     );
   }
 
+  // Builds the text element with a TextField or Text widget based on edit mode
+  // Handles resizing and alignment guides for the text element.
   Widget _buildTextElement(TextElement element, bool isSelected, BoxConstraints constraints) {
     final textPainter = TextPainter(
       text: TextSpan(
@@ -383,6 +393,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
     );
   }
 
+  // Builds the resize handle for the text element
   Widget _buildResizeHandle(TextElement element, Corner corner, BoxConstraints constraints) {
     return Positioned(
       left: corner == Corner.left ? 0 : null,
@@ -459,6 +470,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
     );
   }
 
+  // Checks for alignment guides based on the current position of the moving element
   void _checkAlignments(TextElement movingElement, Offset newPosition, BoxConstraints constraints) {
     Rect movingRect = Rect.fromLTWH(
       newPosition.dx, 
@@ -492,6 +504,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
     _checkScreenAlignment(movingRect, constraints);
   }
 
+  // Checks for alignment guides based on the current position of the moving element
   void _checkEdgeAlignment(Rect moving, Rect fixed) {
     // Left edge
     if ((moving.left - fixed.left).abs() < 20) {
@@ -514,6 +527,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
     }
   }
 
+  // Checks for center alignment guides based on the current position of the moving element
   void _checkCenterAlignment(Rect moving, Rect fixed) {
     // Vertical center
     if ((moving.center.dx - fixed.center.dx).abs() < 20) {
@@ -536,6 +550,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
     }
   }
 
+  // Checks for spacing guides based on the current position of the moving element
   void _checkSpacing(Rect moving, Rect fixed) {
     // Horizontal spacing
     if ((moving.left - fixed.right).abs() < 40) {
@@ -558,6 +573,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
     }
   }
 
+  // Checks for screen alignment guides based on the current position of the moving element
   void _checkScreenAlignment(Rect rect, BoxConstraints constraints) {
     // Screen edges
     if ((rect.left - screenPadding).abs() < 20) {
@@ -618,6 +634,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
     }
   }
 
+  // Aligns the selected element with other elements or screen edges based on the selected alignment type
   void _alignSelectedElements(AlignmentType alignment) {
     if (_selectedElement == null) return;
     
@@ -693,6 +710,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
     });
   }
 
+  // Deletes the selected text element from the canvas
   void _deleteSelectedElement() {
     if (_selectedElement != null) {
       setState(() {
@@ -702,6 +720,8 @@ class _DrawingScreenState extends State<DrawingScreen> {
     }
   }
 
+  // Toggles the edit mode for the canvas
+  // In edit mode, the user can select and move text elements or rectangles.
   void _toggleEditMode() {
     setState(() {
       _editMode = !_editMode;
@@ -712,6 +732,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
     });
   }
 
+  // Processes rectangles to check for overlaps with text elements
   Future<void> _processRectangles() async {
     List<Rect> rectsToRemove = [];
     
@@ -762,6 +783,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
     setState(() => rectangles.removeWhere((r) => rectsToRemove.contains(r)));
   }
 
+  // Exports the current drawing to a PDF file
   Future<void> _exportToPDF() async {
     try {
       final pdf = pw.Document(
@@ -846,6 +868,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
     }
   }
 
+  // Calculates the content bounds of all rectangles and text elements
   Rect _calculateContentBounds() {
     double minX = double.infinity;
     double minY = double.infinity;
@@ -874,10 +897,10 @@ class _DrawingScreenState extends State<DrawingScreen> {
   }
 }
 
-// New supporting classes and enums:
 
 enum GuideType { horizontal, vertical, spacing }
 
+// Represents an alignment guide for snapping elements to edges or centers
 class AlignmentGuide {
   final GuideType type;
   final double position;
@@ -958,6 +981,7 @@ class GridPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+// Custom painter for drawing rectangles and text elements on the canvas
 class DrawingPainter extends CustomPainter {
   final List<Rect> rectangles;
   final Rect? currentRect;
@@ -1010,6 +1034,7 @@ class DrawingPainter extends CustomPainter {
       oldDelegate.selectedElement != selectedElement;
 }
 
+// Represents a text element on the canvas
 class TextElement {
   Offset position;
   Size size;
