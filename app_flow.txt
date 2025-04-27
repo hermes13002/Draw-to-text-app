@@ -16,8 +16,13 @@ things to add
 7. pdf content refinement
 8. text editing e.g font size, syle, family, color, adding bullets etc
 
-LIMITATIONS
-1. users can not draw on any area where there's a textbox
+ISSUES
+1. when exported to pdf, the text content is all over the place
 2. when the content does not fill the rectangle, the rectangle does not resize 
     to fit the content of the textbox
-3. when exported to pdf, the text content is all over the place
+3. alignment tools on toolbar not working
+
+LIMITATIONS
+1. users can not draw on any area where there's a textbox
+2. 
+3. 
