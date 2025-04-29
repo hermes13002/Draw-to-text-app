@@ -1,6 +1,6 @@
-things to add
+FEATURES
 1. scrollview
-2. resizing should be allowed on all sides, top, right, bottom, left
+2. resizing should be allowed on all sides, top, right, bottom, left (DONE)
 3. delete button for selected boxes (DONE)
 4. padding at edge of screen, 16px (DONE)
 5. when user is dragging, there should be tracking 
@@ -13,16 +13,39 @@ things to add
     Alignment Toolbar:
         * Floating toolbar with alignment buttons
         * Supports left/right/top/bottom/center alignment
+    Adjust alignment
 7. pdf content refinement
-8. text editing e.g font size, syle, family, color, adding bullets etc
+8. text editing e.g font size, syle, family, color, adding bullets etc (DONE)
+9. use freehand to draw lines for rows and columns then convert to table (ask ai for suggestions to implement it)
+10. make spaces uniform between headers and sub topic
+11. in edit mode, add up down right left button to manually move textboxes in the four directions
 
 ISSUES
 1. when exported to pdf, the text content is all over the place
 2. when the content does not fill the rectangle, the rectangle does not resize 
     to fit the content of the textbox
 3. alignment tools on toolbar not working
+4. add warning/information using snackbar to tell users when rectangle 
+    drawn on other textboxes and it cant be drawn
 
 LIMITATIONS
 1. users can not draw on any area where there's a textbox
 2. 
 3. 
+
+
+CLIENT OTHER PROPOSED PROJECT
+autogpt
+beautifulsoup
+selenium 
+
+
+
+final textPainter = TextPainter(
+      text: TextSpan(
+        text: element.controller.text,
+        style: TextStyle(fontSize: 16),
+      ),
+      maxLines: null,
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: element.size.width - 16);

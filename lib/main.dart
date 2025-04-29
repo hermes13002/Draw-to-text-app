@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
@@ -132,8 +133,6 @@ class _DrawingScreenState extends State<DrawingScreen> {
                   ),
                 
                 // Drawing Canvas
-                // Handles drawing rectangles and text elements on the canvas.
-                // Uses GestureDetector to track touch events for drawing and moving elements.
                 GestureDetector(
                   onPanStart: (details) {
                     if (_editMode) return;
@@ -195,8 +194,6 @@ class _DrawingScreenState extends State<DrawingScreen> {
                 ),
                 
                 // Text Elements
-                // Places text elements on the canvas
-                // Handles selection, dragging, and alignment of text elements.
                 ...textElements.map((element) {
                   bool isSelected = _editMode && _selectedElement == element;
                   return Positioned(
@@ -219,34 +216,22 @@ class _DrawingScreenState extends State<DrawingScreen> {
                       onPanUpdate: (details) {
                         if (isSelected && _positionEditMode && _dragStartOffset != null) {
                           setState(() {
-                            // Calculate proposed new position
                             Offset newPosition = element.position + (details.localPosition - _dragStartOffset!);
-                            
-                            // Clear previous guides
                             activeGuides.clear();
-                            
-                            // Check for alignments
                             _checkAlignments(element, newPosition, constraints);
                             
-                            // Apply snapping if close to guide
                             for (var guide in activeGuides) {
-                              if (guide.type == GuideType.horizontal) {
-                                if ((newPosition.dy - guide.position).abs() < snapThreshold) {
-                                  newPosition = Offset(newPosition.dx, guide.position);
-                                }
-                              } else if (guide.type == GuideType.vertical) {
-                                if ((newPosition.dx - guide.position).abs() < snapThreshold) {
-                                  newPosition = Offset(guide.position, newPosition.dy);
-                                }
+                              if (guide.type == GuideType.horizontal && (newPosition.dy - guide.position).abs() < snapThreshold) {
+                                newPosition = Offset(newPosition.dx, guide.position);
+                              } else if (guide.type == GuideType.vertical && (newPosition.dx - guide.position).abs() < snapThreshold) {
+                                newPosition = Offset(guide.position, newPosition.dy);
                               }
                             }
                             
-                            // Update position with constraints
                             element.position = Offset(
                               newPosition.dx.clamp(screenPadding, constraints.maxWidth - screenPadding - element.size.width),
                               newPosition.dy.clamp(screenPadding, constraints.maxHeight - screenPadding - element.size.height),
                             );
-                            
                             _dragStartOffset = details.localPosition;
                           });
                         }
@@ -262,8 +247,6 @@ class _DrawingScreenState extends State<DrawingScreen> {
                 }).toList(),
                 
                 // Alignment Guides
-                // Displays alignment guides when dragging elements
-                // Shows guides for edges, centers, and spacing between elements.
                 if (_editMode && _positionEditMode && _selectedElement != null)
                   ...activeGuides.map((guide) {
                     return Positioned(
@@ -297,8 +280,6 @@ class _DrawingScreenState extends State<DrawingScreen> {
                   }),
                 
                 // Alignment Toolbar
-                // Displays alignment options when an element is selected
-                // Allows user to align selected element with other elements or screen edges.
                 if (_editMode && _positionEditMode && _selectedElement != null)
                   Positioned(
                     bottom: 20,
@@ -308,6 +289,15 @@ class _DrawingScreenState extends State<DrawingScreen> {
                         _alignSelectedElements(alignment);
                       },
                     ),
+                  ),
+                
+                // Formatting Toolbar - NEW
+                if (_editMode && _positionEditMode && _selectedElement != null)
+                  FormattingToolbar(
+                    element: _selectedElement!,
+                    onFormatChanged: (updatedElement) {
+                      setState(() {});
+                    },
                   ),
               ],
             );
@@ -324,72 +314,58 @@ class _DrawingScreenState extends State<DrawingScreen> {
   // Builds the text element with a TextField or Text widget based on edit mode
   // Handles resizing and alignment guides for the text element.
   Widget _buildTextElement(TextElement element, bool isSelected, BoxConstraints constraints) {
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: element.controller.text,
-        style: TextStyle(fontSize: 16),
-      ),
-      maxLines: null,
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: element.size.width - 16);
-
-    final calculatedHeight = textPainter.size.height + 16;
-    
-    return StatefulBuilder(
-      builder: (context, setState) {
-        if (_contentEditMode && element == _selectedElement) {
-          element.size = Size(element.size.width, calculatedHeight);
-        }
-        
-        return Stack(
-          children: [
-            Container(
-              width: element.size.width,
-              height: _contentEditMode && element == _selectedElement 
-                  ? null
-                  : max(calculatedHeight, 40),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: isSelected ? Colors.blue : Colors.transparent,
-                  width: 2.0,
-                ),
-                color: _contentEditMode ? Colors.white.withOpacity(0.9) : Colors.transparent,
-              ),
-              child: _contentEditMode && element == _selectedElement
-                  ? TextField(
-                      controller: element.controller,
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.all(8),
-                      ),
-                      maxLines: null,
-                      keyboardType: TextInputType.multiline,
-                      onChanged: (text) => setState(() {}),
-                    )
-                  : Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Text(
-                        element.controller.text,
-                        style: TextStyle(fontSize: 16),
-                        maxLines: null,
-                        softWrap: true,
-                      ),
-                    ),
+    return Stack(
+      children: [
+        // Text Container
+        Container(
+          width: element.size.width,
+          height: element.size.height,
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: isSelected ? Colors.blue : Colors.transparent,
+              width: 2.0,
             ),
-            
-            if (isSelected && _positionEditMode) ...[
-              // Top resize handle
-              _buildResizeHandle(element, Corner.top, constraints),
-              // Right resize handle
-              _buildResizeHandle(element, Corner.right, constraints),
-              // Bottom resize handle
-              _buildResizeHandle(element, Corner.bottom, constraints),
-              // Left resize handle
-              _buildResizeHandle(element, Corner.left, constraints),
-            ],
-          ],
-        );
-      },
+            color: _contentEditMode ? Colors.white.withOpacity(0.9) : Colors.transparent,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: _contentEditMode && element == _selectedElement
+                ? TextField(
+                    controller: element.controller,
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    style: TextStyle(
+                      fontSize: element.fontSize,
+                      fontWeight: element.isBold ? FontWeight.bold : FontWeight.normal,
+                      fontStyle: element.isItalic ? FontStyle.italic : FontStyle.normal,
+                      color: element.textColor,
+                    ),
+                    textAlign: element.alignment,
+                    maxLines: null,
+                  )
+                : Text(
+                    element.controller.text,
+                    style: TextStyle(
+                      fontSize: element.fontSize,
+                      fontWeight: element.isBold ? FontWeight.bold : FontWeight.normal,
+                      fontStyle: element.isItalic ? FontStyle.italic : FontStyle.normal,
+                      color: element.textColor,
+                    ),
+                    textAlign: element.alignment,
+                  ),
+          ),
+        ),
+        
+        // Resize Handles
+        if (isSelected && _positionEditMode) ...[
+          _buildResizeHandle(element, Corner.top, constraints),
+          _buildResizeHandle(element, Corner.right, constraints),
+          _buildResizeHandle(element, Corner.bottom, constraints),
+          _buildResizeHandle(element, Corner.left, constraints),
+        ],
+      ],
     );
   }
 
@@ -1039,11 +1015,23 @@ class TextElement {
   Offset position;
   Size size;
   TextEditingController controller;
+  
+  // New formatting properties
+  double fontSize;
+  bool isBold;
+  bool isItalic;
+  Color textColor;
+  TextAlign alignment;
 
   TextElement({
     required this.position,
     required this.size,
     required this.controller,
+    this.fontSize = 16, // Default size
+    this.isBold = false,
+    this.isItalic = false,
+    this.textColor = Colors.black, // Default color
+    this.alignment = TextAlign.left,
   });
 }
 
@@ -1102,6 +1090,146 @@ class _TextInputDialogState extends State<TextInputDialog> {
           child: Text('Add'),
         ),
       ],
+    );
+  }
+}
+
+
+class FormattingToolbar extends StatelessWidget {
+  final TextElement element;
+  final Function(TextElement) onFormatChanged;
+
+  const FormattingToolbar({
+    super.key,
+    required this.element,
+    required this.onFormatChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: element.position.dx,
+      top: element.position.dy + element.size.height + 8,
+      child: Card(
+        elevation: 4,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Wrap(
+            spacing: 4,
+            children: [
+              // Font Size
+              IconButton(
+                icon: const Icon(Icons.text_fields, size: 20),
+                onPressed: () => _showFontSizeDialog(context),
+              ),
+              
+              // Bold
+              IconButton(
+                icon: const Icon(Icons.format_bold, size: 20),
+                color: element.isBold ? Colors.blue : null,
+                onPressed: () => onFormatChanged(
+                  element..isBold = !element.isBold
+                ),
+              ),
+              
+              // Italic
+              IconButton(
+                icon: const Icon(Icons.format_italic, size: 20),
+                color: element.isItalic ? Colors.blue : null,
+                onPressed: () => onFormatChanged(
+                  element..isItalic = !element.isItalic
+                ),
+              ),
+              
+              // Color
+              IconButton(
+                icon: const Icon(Icons.color_lens, size: 20),
+                onPressed: () => _showColorPicker(context),
+              ),
+              
+              // Alignment
+              PopupMenuButton<TextAlign>(
+                icon: const Icon(Icons.format_align_left, size: 20),
+                itemBuilder: (context) => [
+                  _buildAlignmentItem(Icons.format_align_left, TextAlign.left),
+                  _buildAlignmentItem(Icons.format_align_center, TextAlign.center),
+                  _buildAlignmentItem(Icons.format_align_justify, TextAlign.justify),
+                  _buildAlignmentItem(Icons.format_align_right, TextAlign.right),
+                ],
+                onSelected: (align) => onFormatChanged(
+                  element..alignment = align
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<TextAlign> _buildAlignmentItem(IconData icon, TextAlign align) {
+    return PopupMenuItem(
+      value: align,
+      child: Row(
+        children: [
+          Icon(icon, color: element.alignment == align ? Colors.blue : null),
+          const SizedBox(width: 8),
+          Text(align.toString().split('.').last),
+        ],
+      ),
+    );
+  }
+
+  void _showFontSizeDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Font Size'),
+          content: DropdownButton<double>(
+            value: element.fontSize,
+            items: [12, 14, 16, 18, 20, 24, 28].map((size) {
+              return DropdownMenuItem(
+                value: size.toDouble(),
+                child: Text('$size'),
+              );
+            }).toList(),
+            onChanged: (size) {
+              if (size != null) {
+                onFormatChanged(element..fontSize = size);
+                Navigator.pop(context);
+              }
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void _showColorPicker(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Text Color'),
+          content: SingleChildScrollView(
+            child: ColorPicker(
+              pickerColor: element.textColor,
+              onColorChanged: (color) {
+                onFormatChanged(element..textColor = color);
+              },
+              showLabel: true,
+              pickerAreaHeightPercent: 0.8,
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        );
+      },
     );
   }
 }
